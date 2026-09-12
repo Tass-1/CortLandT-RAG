@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from .config import settings
+from config import settings
 
 def get_session():
     client = QdrantClient(
