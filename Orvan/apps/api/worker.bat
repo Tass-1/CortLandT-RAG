@@ -1,0 +1,1 @@
+celery -A services.celery.celeryApp worker --loglevel=info --pool=solo

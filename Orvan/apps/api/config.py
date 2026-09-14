@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     DB : str
     API : str
     GEMINI: str
+    MONGODB_URI: str
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
