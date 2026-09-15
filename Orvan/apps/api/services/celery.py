@@ -4,6 +4,7 @@ import redis
 from bs4 import BeautifulSoup
 import pymongo
 from config import settings
+from services.celeryt2 import process_data
 mongo_client = pymongo.MongoClient(settings.MONGODB_URI)
 mongo_db = mongo_client["orvan"]
 coll = mongo_db["Fin-Data"]
@@ -16,6 +17,9 @@ def fetch_file(ticker:str ):
         "User-Agent": "Priyanshu Joshi (priyanshujoshi10000@gmail.com)"
     }
     ticker = ticker.upper()
+    if coll.find_one({"ticker":ticker}):
+        return f'{ticker} is already present in both dbs'
+    
     ticker_cik = cache.get(ticker)
     
     if not ticker_cik:
@@ -46,13 +50,10 @@ def fetch_file(ticker:str ):
         doc = recent_files["primaryDocument"][tgi]
         report = recent_files["reportDate"][tgi]
         raw_cik = ticker_cik.strip("0")
-        final_file = httpx.get(f'https://www.sec.gov/Archives/edgar/data/{raw_cik}/{acession}/{doc}' , headers= headers).text
+        
         
 
-        soup = BeautifulSoup(final_file, "html.parser")
-        for tag in soup(["script", "style","noscript","meta"]):
-            tag.decompose()
-        ## parse the tables and then insert into the qdrant db 
+        
 
 
         res = httpx.get(f'https://data.sec.gov/api/xbrl/companyfacts/CIK{ticker_cik}.json', headers = headers)
@@ -70,12 +71,12 @@ def fetch_file(ticker:str ):
                 "ticker": ticker,
                 "financials": us_gaap
             }
-            print(insert_data)
             coll.update_one(
             {"ticker": ticker.upper()},
             {"$set": insert_data},
             upsert=True
-        )
+            )   
+            process_data.delay(raw_cik, acession, doc)
         
 
         
