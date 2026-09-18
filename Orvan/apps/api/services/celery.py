@@ -11,7 +11,7 @@ coll = mongo_db["Fin-Data"]
 
 celeryApp = Celery("fetch-file" , broker="redis://localhost:6379/1")
 cache = redis.Redis(host="localhost" , port=6379, db=1 ,decode_responses=True)
-@celeryApp.task
+@celeryApp.task(queue="sec_queue")
 def fetch_file(ticker:str ):
     headers = {
         "User-Agent": "Priyanshu Joshi (priyanshujoshi10000@gmail.com)"
@@ -76,7 +76,7 @@ def fetch_file(ticker:str ):
             {"$set": insert_data},
             upsert=True
             )   
-            process_data.delay(raw_cik, acession, doc)
+            process_data.delay(raw_cik, acession, doc, ticker)
         
 
         
