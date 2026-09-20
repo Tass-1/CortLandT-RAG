@@ -1,4 +1,4 @@
-from database import get_session
+
 from qdrant_client import models, QdrantClient
 from fastapi import Depends
 from config import settings
@@ -8,10 +8,16 @@ def genrate_schema(qdrant: QdrantClient):
         
         qdrant.create_collection(
             collection_name = "Fin-Data",
-            vectors_config = models.VectorParams(
+            vectors_config = {"dense": models.VectorParams(
                 size = 3072,
                 distance = models.Distance.COSINE
-            )
+                )
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(
+                    modifier=models.Modifier.IDF
+                )
+            }
         )
         qdrant.create_payload_index(
             collection_name="Fin-Data",

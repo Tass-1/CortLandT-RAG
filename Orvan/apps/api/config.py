@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     API : str
     GEMINI: str
     MONGODB_URI: str
+    POSTGRES: str
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()

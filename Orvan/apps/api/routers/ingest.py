@@ -1,6 +1,6 @@
 from qdrant_client import QdrantClient, models
-from database import get_session
-from embedder import emSession
+from generators import get_session , emSession
+
 from google import genai
 from fastapi import APIRouter, Depends
 import httpx
@@ -11,25 +11,18 @@ router = APIRouter()
 
 @router.post("/ingest")
 async def ingestion(ticker: str, qdrant: QdrantClient = Depends(get_session) , gclient: genai.Client = Depends(emSession)):
-    g = gclient.models.embed_content(
-        model = "gemini-embedding-2",
-        contents=ticker
+    result , off = qdrant.scroll(
+            collection_name="Fin-Data",
+            scroll_filter=models.Filter(
+                must=[
+                    models.FieldCondition(key="ticker", match=models.MatchValue(value=ticker.upper())),
+                ]
+            ),
+            limit=1,
+            with_payload=True,
+            with_vectors=False,
     )
-    result = qdrant.query_points(
-        collection_name="Fin-Data",
-        query = g.embeddings[0].values,
-        query_filter=models.Filter(
-            must=[
-                models.FieldCondition(
-                    key = "ticker",
-                    match= models.MatchValue(
-                        value = ticker
-                    )
-                )
-            ]
-        )
-    )
-    if result.points:
+    if result:
         #send to chat
         print(result)
         print("There is teh ticker")

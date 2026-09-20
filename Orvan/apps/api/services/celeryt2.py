@@ -11,11 +11,13 @@ import re
 from google import genai
 from config import settings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from fastembed import SparseTextEmbedding
 
 gclient = genai.Client(api_key = settings.GEMINI)
 client = QdrantClient(url= settings.DB, api_key= settings.API)
 celeryT2 = Celery("process-file" , broker="redis://localhost:6379/1")
 cache = redis.Redis(host="localhost" , port=6379 , db=2 , decode_responses=True)
+sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
 @celeryT2.task(queue="embed_queue")
 def process_data(cik:str , acnum: str, doc:str , ticker: str):
@@ -49,12 +51,17 @@ def process_data(cik:str , acnum: str, doc:str , ticker: str):
                 model = "gemini-embedding-2",
                 contents=batch
             )
+            sparse_embeddings = list(sparse_model.embed(batch))
             points = []
             for idx , vec in enumerate(res.embeddings):
                 points.append(
                     models.PointStruct(
                         id = str(uuid.uuid4()),
-                        vector = vec.values,
+                        vector = {"dense": vec.values,
+                                  "sparse": models.SparseVector(
+                                        indices=sparse_embeddings[idx].indices.tolist(),
+                                        values=sparse_embeddings[idx].values.tolist()
+                                  )},
                         payload = {
                             "ticker": ticker.upper(),
                             "text": batch[idx]
@@ -66,6 +73,6 @@ def process_data(cik:str , acnum: str, doc:str , ticker: str):
                 collection_name="Fin-Data",
                 points=points
             )
-            time.sleep(9)
+            time.sleep(10)
 
     print()
