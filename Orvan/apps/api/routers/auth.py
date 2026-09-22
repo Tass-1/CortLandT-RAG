@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from schema.postgresql import User 
 from generators import get_post
 from pwdlib import PasswordHash
-from jwt.exceptions import InvalidTokenError
+
 from config import settings
 router = APIRouter()
 pass_hash = PasswordHash.recommended()
@@ -34,7 +34,7 @@ async def auth(data: Req , db: Session = Depends(get_post)):
             "sub": email,
             "exp": datetime.now(timezone.utc) + timedelta(days=2)
         }
-        encoded_jwt = jwt.encode( enc , settings.JWT_KEY, settings.JWT_ALGO)
+        encoded_jwt = jwt.encode( enc , settings.JWT_KEY, algorithm=settings.JWT_ALGO)
         new_user = User(
             name = name,
             email = email,
@@ -56,7 +56,7 @@ class SReq(BaseModel):
 @router.post("/signin")
 async def signin(data: SReq, db: Session = Depends(get_post)):
     user = db.execute(select(User).where(User.email == data.email)).scalars().first()
-    if not user or not user.password == pass_hash.hash(data.password):
+    if not user or not pass_hash.verify(data.password , user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"

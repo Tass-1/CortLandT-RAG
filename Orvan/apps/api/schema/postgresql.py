@@ -11,7 +11,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(150))
     email: Mapped[str] = mapped_column(String(1000),  unique=True, nullable=False ,index=True)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    session: Mapped[List["Chatsession"]] = relationship(back_populates="users", cascade="all, delete-orphan" )
+    sessions: Mapped[List["Chatsession"]] = relationship(back_populates="users", cascade="all, delete-orphan" )
 
 class Chatsession(Base):
     __tablename__ = "chat_sessions"
@@ -19,6 +19,7 @@ class Chatsession(Base):
     userId: Mapped[int] = mapped_column(ForeignKey("users.id"))
     ticker: Mapped[str] = mapped_column(String(6), index=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime , default=lambda: datetime.now(timezone.utc))
+    users: Mapped["User"] = relationship(back_populates="sessions")
     messages: Mapped[List["Messages"]] = relationship(back_populates="session", cascade="all, delete-orphan")
 
 class Messages(Base):
