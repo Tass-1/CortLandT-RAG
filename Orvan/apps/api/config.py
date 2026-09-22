@@ -7,5 +7,7 @@ class Settings(BaseSettings):
     MONGODB_URI: str
     POSTGRES: str
     model_config = SettingsConfigDict(env_file=".env")
+    JWT_KEY: str
+    JWT_ALGO: str
 
 settings = Settings()

@@ -6,17 +6,17 @@ class Base(DeclarativeBase):
     pass
 
 class User(Base):
-    __tablename__ = "user"
+    __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True , index=True)
     name: Mapped[str] = mapped_column(String(150))
     email: Mapped[str] = mapped_column(String(1000),  unique=True, nullable=False ,index=True)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    session: Mapped[List["Chatsession"]] = relationship(back_populates="user", cascade="all, delete-orphan" )
+    session: Mapped[List["Chatsession"]] = relationship(back_populates="users", cascade="all, delete-orphan" )
 
 class Chatsession(Base):
     __tablename__ = "chat_sessions"
     id: Mapped[int] = mapped_column(primary_key=True , index=True)
-    userId: Mapped[int] = mapped_column(ForeignKey("user.id"))
+    userId: Mapped[int] = mapped_column(ForeignKey("users.id"))
     ticker: Mapped[str] = mapped_column(String(6), index=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime , default=lambda: datetime.now(timezone.utc))
     messages: Mapped[List["Messages"]] = relationship(back_populates="session", cascade="all, delete-orphan")
