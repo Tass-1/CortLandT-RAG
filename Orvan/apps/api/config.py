@@ -9,5 +9,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
     JWT_KEY: str
     JWT_ALGO: str
+    GROQ_API: str
 
 settings = Settings()

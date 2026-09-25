@@ -7,6 +7,7 @@ from config import settings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
+from groq import Groq
 
 engine = create_engine(settings.POSTGRES)
 session = sessionmaker(autocommit=False, autoflush=False, bind=engine )
@@ -41,3 +42,9 @@ def get_post():
     finally:
         db.close()
 
+def get_groq():
+    client = Groq( api_key = settings.GROQ_API)
+    try:
+        yield client
+    finally:
+        client.close()

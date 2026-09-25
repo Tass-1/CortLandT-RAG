@@ -1,9 +1,10 @@
 from datetime import datetime
 from fastembed import SparseTextEmbedding, TextEmbedding
+from groq import Groq
 from qdrant_client import models, QdrantClient
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from generators import emSession, get_session, mongo, get_post
+from generators import emSession, get_session, mongo, get_post , get_groq
 from google import genai
 import motor.motor_asyncio
 from dependencies import verify_jwt
@@ -21,9 +22,9 @@ class Req(BaseModel):
 dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 @router.post("/chat")
-async def chat(payload: Req, session_id: str | None= None,  email: str = Depends(verify_jwt), gclient: genai.Client = Depends(emSession), qdrant: QdrantClient = Depends(get_session) , mongodb: motor.motor_asyncio.AsyncIOMotorClient = Depends(mongo) , postdb: Session = Depends(get_post)):
+async def chat(payload: Req, session_id: str | None= None,  email: str = Depends(verify_jwt), groq: Groq = Depends(get_groq), qdrant: QdrantClient = Depends(get_session) , mongodb: motor.motor_asyncio.AsyncIOMotorClient = Depends(mongo) , postdb: Session = Depends(get_post)):
     prevchats = ""
-
+    res = []
     if session_id:
         chats = postdb.execute(select(Messages).where(Messages.sessionId == session_id).order_by(Messages.id.desc()).limit(5))
         res = chats.scalars().all()[::-1]
@@ -89,11 +90,24 @@ async def chat(payload: Req, session_id: str | None= None,  email: str = Depends
     CURRENT USER QUESTION:
     {payload.prompt}
     """
-    llm_response = gclient.models.generate_content(
-        model="gemini-3.8-flash", 
-        contents=master_prompt
+    
+    formatted_messages = [
+        {"role": "system", "content": master_prompt}
+    ]
+
+    if session_id:
+        for chat in res:
+            mapped_role = "user" if chat.role.lower() == "user" else "assistant"
+            formatted_messages.append({"role": mapped_role, "content": chat.content})
+            
+    formatted_messages.append({"role": "user", "content": payload.prompt})
+
+    llm_response = groq.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=formatted_messages,
+        temperature=0.0
     )
-    final_answer = llm_response.text
+    final_answer = llm_response.choices[0].message.content
     
     new_message = Messages(sessionId = session_id, content=payload.prompt, role= "User")
     new_prompt = Messages(sessionId = session_id, content=final_answer, role= "LLM")
