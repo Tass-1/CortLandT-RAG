@@ -11,14 +11,14 @@ import re
 from google import genai
 from config import settings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from fastembed import SparseTextEmbedding
+from fastembed import SparseTextEmbedding, TextEmbedding
 
 gclient = genai.Client(api_key = settings.GEMINI)
 client = QdrantClient(url= settings.DB, api_key= settings.API)
 celeryT2 = Celery("process-file" , broker="redis://localhost:6379/1")
 cache = redis.Redis(host="localhost" , port=6379 , db=2 , decode_responses=True)
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-
+dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 @celeryT2.task(queue="embed_queue")
 def process_data(cik:str , acnum: str, doc:str , ticker: str):
     headers = {
@@ -30,34 +30,26 @@ def process_data(cik:str , acnum: str, doc:str , ticker: str):
         b = BeautifulSoup(text,"html.parser")
         for tag in b(["script", "style", "noscript", "meta", "head", "header", "footer"]):
             tag.decompose()
-        for table in b.find_all("table"):
-            table.decompose()
-        cleaned = b.get_text(separator="\n\n", strip=True)
-        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
-        cleaned = cleaned.replace("\xa0", " ")
-        cleaned = re.sub(r"[^\S\r\n]+", " ", cleaned)
-        cleaned = re.sub(r"\s*\n\s*", "\n", cleaned)
-        cleaned = re.sub(r"\s*\n\s*", "\n", cleaned)
+        cleaned = b.get_text(separator=" | ", strip=True)
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+        
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size = 1000,
-            chunk_overlap = 100,
+            chunk_size = 1500,
+            chunk_overlap = 150,
             separators=["\n\n", "\n", " ", ""]
         )
 
         chunks = splitter.split_text(cleaned)
-        for i in range(0,len(chunks) , 25):
-            batch = chunks[i:i+25]
-            res = gclient.models.embed_content(
-                model = "gemini-embedding-2",
-                contents=batch
-            )
+        for i in range(0,len(chunks) , 100):
+            batch = chunks[i:i+100]
+            dense_embeddings = list(dense_model.embed(batch))
             sparse_embeddings = list(sparse_model.embed(batch))
             points = []
-            for idx , vec in enumerate(res.embeddings):
+            for idx , vec in enumerate(dense_embeddings):
                 points.append(
                     models.PointStruct(
                         id = str(uuid.uuid4()),
-                        vector = {"dense": vec.values,
+                        vector = {"dense": vec.tolist(),
                                   "sparse": models.SparseVector(
                                         indices=sparse_embeddings[idx].indices.tolist(),
                                         values=sparse_embeddings[idx].values.tolist()
@@ -73,6 +65,5 @@ def process_data(cik:str , acnum: str, doc:str , ticker: str):
                 collection_name="Fin-Data",
                 points=points
             )
-            time.sleep(10)
 
     print()

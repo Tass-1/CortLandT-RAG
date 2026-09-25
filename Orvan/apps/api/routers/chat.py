@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastembed import SparseTextEmbedding
+from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import models, QdrantClient
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -18,12 +18,14 @@ class Req(BaseModel):
     prompt: str
     ticker:str
 
+dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+
 @router.post("/chat")
 async def chat(payload: Req, session_id: str | None= None,  email: str = Depends(verify_jwt), gclient: genai.Client = Depends(emSession), qdrant: QdrantClient = Depends(get_session) , mongodb: motor.motor_asyncio.AsyncIOMotorClient = Depends(mongo) , postdb: Session = Depends(get_post)):
     prevchats = ""
 
     if session_id:
-        chats = postdb.execute(select(Messages).where(Messages.sessionId == session_id).order_by(Messages.id.desc()).limit(6))
+        chats = postdb.execute(select(Messages).where(Messages.sessionId == session_id).order_by(Messages.id.desc()).limit(5))
         res = chats.scalars().all()[::-1]
         for chats in res:
             prevchats += f"{chats.role} : {chats.content}\n"
@@ -36,16 +38,21 @@ async def chat(payload: Req, session_id: str | None= None,  email: str = Depends
         postdb.add(new_session)
         postdb.flush()
         session_id = new_session.id
-
-    vec = gclient.models.embed_content(
-        model = "gemini-embedding-2",
-        contents=payload.prompt
+    query_filter = models.Filter(
+        must=[
+            models.FieldCondition(
+                key="ticker",
+                match=models.MatchValue(value=payload.ticker.upper())
+            )
+        ]
     )
-    Densevector = vec.embeddings[0].values
+
+    Densevector = list(dense_model.embed(payload.prompt))[0].tolist()
     Sparsevector = list(sparse_model.embed(payload.prompt))[0]
     
     search = qdrant.query_points(
         collection_name="Fin-Data",
+        query_filter=query_filter,
         prefetch=[
             models.Prefetch(
                 query=models.SparseVector(

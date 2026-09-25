@@ -3,13 +3,13 @@ from qdrant_client import models, QdrantClient
 from fastapi import Depends
 from config import settings
 def genrate_schema(qdrant: QdrantClient):
-    
+    qdrant.delete_collection(collection_name="Fin-Data")
     if not qdrant.collection_exists("Fin-Data"):
         
         qdrant.create_collection(
             collection_name = "Fin-Data",
             vectors_config = {"dense": models.VectorParams(
-                size = 3072,
+                size = 384,
                 distance = models.Distance.COSINE
                 )
             },
