@@ -9,36 +9,40 @@ import motor.motor_asyncio
 from dependencies import verify_jwt
 from sqlalchemy.orm import Session
 from schema.postgresql import Messages, User, Chatsession
-
+from pydantic import BaseModel
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
 router = APIRouter()
 
+class Req(BaseModel):
+    prompt: str
+    ticker:str
+
 @router.post("/chat")
-async def chat(ticker: str, session_id: str | None= None , prompt: str | None = None,  email: str = Depends(verify_jwt), gclient: genai.Client = Depends(emSession), qdrant: QdrantClient = Depends(get_session) , mongodb: motor.motor_asyncio.AsyncIOMotorClient = Depends(mongo) , postdb: Session = Depends(get_post)):
+async def chat(payload: Req, session_id: str | None= None,  email: str = Depends(verify_jwt), gclient: genai.Client = Depends(emSession), qdrant: QdrantClient = Depends(get_session) , mongodb: motor.motor_asyncio.AsyncIOMotorClient = Depends(mongo) , postdb: Session = Depends(get_post)):
     prevchats = ""
 
     if session_id:
-        chats = await postdb.execute(select(Messages).where(Messages.sessionId == session_id).order_by(Messages.id.desc()).limit(6))
+        chats = postdb.execute(select(Messages).where(Messages.sessionId == session_id).order_by(Messages.id.desc()).limit(6))
         res = chats.scalars().all()[::-1]
         for chats in res:
             prevchats += f"{chats.role} : {chats.content}\n"
     else:
-        user = (await postdb.execute(select(User).where(User.email == email))).scalars().first()
+        user = postdb.execute(select(User).where(User.email == email)).scalars().first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         id = user.id
-        new_session = Chatsession(userId = id, ticker= ticker, createdAt = datetime.now())
+        new_session = Chatsession(userId = id, ticker= payload.ticker, createdAt = datetime.now())
         postdb.add(new_session)
-        await postdb.flush()
+        postdb.flush()
         session_id = new_session.id
 
     vec = gclient.models.embed_content(
         model = "gemini-embedding-2",
-        contents=prompt
+        contents=payload.prompt
     )
     Densevector = vec.embeddings[0].values
-    Sparsevector = list(sparse_model.embed(prompt))[0]
+    Sparsevector = list(sparse_model.embed(payload.prompt))[0]
     
     search = qdrant.query_points(
         collection_name="Fin-Data",
@@ -60,6 +64,9 @@ async def chat(ticker: str, session_id: str | None= None , prompt: str | None = 
         limit=10,
     )
     context_text = "\n\n".join([hit.payload["text"] for hit in search.points])
+    print("\n--- RETRIEVED CONTEXT ---")
+    print(context_text)
+    print("-------------------------\n")
 
     master_prompt = f"""You are an expert financial AI assistant.
     Answer the user's question using ONLY the provided CONTEXT. 
@@ -73,18 +80,18 @@ async def chat(ticker: str, session_id: str | None= None , prompt: str | None = 
     {prevchats}
 
     CURRENT USER QUESTION:
-    {prompt}
+    {payload.prompt}
     """
     llm_response = gclient.models.generate_content(
-        model="gemini-2.5-flash", 
+        model="gemini-3.8-flash", 
         contents=master_prompt
     )
     final_answer = llm_response.text
     
-    new_message = Messages(sessionId = session_id, content=prompt, role= "User")
+    new_message = Messages(sessionId = session_id, content=payload.prompt, role= "User")
     new_prompt = Messages(sessionId = session_id, content=final_answer, role= "LLM")
     postdb.add_all([new_message, new_prompt])
-    await postdb.commit()
+    postdb.commit()
     
     return {
         "session_id": session_id,
