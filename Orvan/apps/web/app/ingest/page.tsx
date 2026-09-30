@@ -1,121 +1,74 @@
 "use client";
 
 import { useState } from "react";
-import { fetchAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TickerCard } from "@/components/ingest/TickerCard";
 
-// Hardcoded options since we don't want custom inputs
-const SUPPORTED_ASSETS = [
-  { ticker: "MSFT", name: "Microsoft Corporation", sector: "Technology" },
-  { ticker: "AAPL", name: "Apple Inc.", sector: "Technology" },
-  { ticker: "NVDA", name: "NVIDIA Corporation", sector: "Semiconductors" },
-  { ticker: "TSLA", name: "Tesla, Inc.", sector: "Automotive" },
-  { ticker: "AMZN", name: "Amazon.com, Inc.", sector: "Consumer Cyclical" },
-  { ticker: "META", name: "Meta Platforms, Inc.", sector: "Communication Services" },
-  { ticker: "JPM", name: "JPMorgan Chase & Co.", sector: "Financial Services" },
+const INITIAL_ASSETS = [
+  { ticker: "MSFT", name: "Microsoft Corporation", basePrice: 420.55 },
+  { ticker: "AAPL", name: "Apple Inc.", basePrice: 173.50 },
+  { ticker: "NVDA", name: "NVIDIA Corporation", basePrice: 880.20 },
+  { ticker: "TSLA", name: "Tesla, Inc.", basePrice: 175.34 },
+  { ticker: "AMZN", name: "Amazon.com, Inc.", basePrice: 185.20 },
+  { ticker: "META", name: "Meta Platforms, Inc.", basePrice: 502.30 },
+  { ticker: "JPM", name: "JPMorgan Chase & Co.", basePrice: 198.40 },
+  { ticker: "GOOGL", name: "Alphabet Inc.", basePrice: 165.80 },
+  { ticker: "PLTR", name: "Palantir Technologies", basePrice: 23.50 },
 ];
 
 export default function IngestPage() {
-  const [loadingTickers, setLoadingTickers] = useState<Record<string, boolean>>({});
-  const [statusMessages, setStatusMessages] = useState<Record<string, string>>({});
+  const [assets, setAssets] = useState(INITIAL_ASSETS);
+  const [searchInput, setSearchInput] = useState("");
 
-  const handleIngest = async (ticker: string) => {
-    setLoadingTickers((prev) => ({ ...prev, [ticker]: true }));
-    setStatusMessages((prev) => ({ ...prev, [ticker]: "Initiating..." }));
-
-    try {
-      // Because FastAPI defined `ticker: str` without a Pydantic model, 
-      // it expects a query parameter: /ingest?ticker=MSFT
-      const data = await fetchAPI(`/ingest?ticker=${ticker}`, {
-        method: "POST",
-      });
-
-      // Assuming your Celery task handles the actual download/embedding in the background
-      setStatusMessages((prev) => ({ 
-        ...prev, 
-        [ticker]: "Task dispatched to worker" 
-      }));
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setStatusMessages((prev) => {
-          const newState = { ...prev };
-          delete newState[ticker];
-          return newState;
-        });
-      }, 3000);
-
-    } catch (err: any) {
-      setStatusMessages((prev) => ({ 
-        ...prev, 
-        [ticker]: `Error: ${err.message}` 
-      }));
-    } finally {
-      setLoadingTickers((prev) => ({ ...prev, [ticker]: false }));
+  const handleAddTicker = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchInput.trim()) return;
+    
+    const newTicker = searchInput.trim().toUpperCase();
+    
+    if (assets.some(a => a.ticker === newTicker)) {
+      setSearchInput("");
+      return;
     }
+
+    setAssets((prev) => [
+      { ticker: newTicker, name: "Custom Added Entity", basePrice: Math.floor(Math.random() * 300) + 50 },
+      ...prev
+    ]);
+    setSearchInput("");
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--background)] p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="flex-1 overflow-y-auto bg-[var(--background)] p-8 md:p-12">
+      <div className="max-w-[1400px] mx-auto space-y-10">
         
-        {/* Page Header */}
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-white">Data Sources</h1>
-          <p className="text-[var(--muted)] text-sm">
-            Select entities to fetch and embed their latest SEC Form 10-K filings into the Qdrant vector database.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[var(--border)] pb-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-white">Market Intelligence Hub</h1>
+            <p className="text-[var(--muted)] text-base max-w-xl">
+              Monitor live entities and trigger autonomous SEC Form 10-K ingestion into the Qdrant vector space.
+            </p>
+          </div>
+
+          <form onSubmit={handleAddTicker} className="flex gap-3 w-full md:w-96 shadow-sm">
+            <Input 
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Enter ticker (e.g. COIN)..."
+              className="h-11 bg-[var(--surface)] border-[var(--border)] focus-visible:ring-1 focus-visible:ring-[var(--primary)] text-[15px]"
+            />
+            <Button type="submit" className="h-11 px-6 bg-[var(--primary)] text-white hover:bg-[#534be5] font-medium transition-colors">
+              Add Node
+            </Button>
+          </form>
         </div>
 
-        {/* Assets Table */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[var(--background)] border-b border-[var(--border)] text-[var(--muted)] font-medium">
-              <tr>
-                <th className="py-3 px-6 w-1/3">Entity</th>
-                <th className="py-3 px-6 w-1/4">Ticker</th>
-                <th className="py-3 px-6 w-1/4">Sector</th>
-                <th className="py-3 px-6 w-1/6 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {SUPPORTED_ASSETS.map((asset) => (
-                <tr key={asset.ticker} className="hover:bg-[var(--background)]/40 transition-colors">
-                  <td className="py-4 px-6 font-medium text-white">{asset.name}</td>
-                  <td className="py-4 px-6">
-                    <span className="font-mono text-xs px-2 py-1 bg-[var(--background)] border border-[var(--border)] rounded text-[var(--muted)]">
-                      {asset.ticker}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-[var(--muted)]">{asset.sector}</td>
-                  <td className="py-4 px-6 text-right">
-                    <div className="flex flex-col items-end gap-2">
-                      <Button
-                        onClick={() => handleIngest(asset.ticker)}
-                        disabled={loadingTickers[asset.ticker]}
-                        className="h-8 px-4 bg-[var(--background)] border border-[var(--border)] text-white hover:bg-[var(--primary)] hover:border-[var(--primary)] text-xs font-medium transition-all w-24"
-                      >
-                        {loadingTickers[asset.ticker] ? (
-                          <span className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                            Syncing
-                          </span>
-                        ) : (
-                          "Sync Data"
-                        )}
-                      </Button>
-                      
-                      {statusMessages[asset.ticker] && (
-                        <span className={`text-[10px] font-mono ${statusMessages[asset.ticker].includes("Error") ? "text-red-400" : "text-emerald-400"}`}>
-                          {statusMessages[asset.ticker]}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Larger, spacious grid layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {assets.map((asset) => (
+            <TickerCard key={asset.ticker} asset={asset} />
+          ))}
         </div>
 
       </div>

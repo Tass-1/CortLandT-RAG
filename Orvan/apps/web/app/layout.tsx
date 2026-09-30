@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
+import { TrippyNav } from "@/components/TrippyNav";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${jetbrains.variable} font-sans antialiased h-screen bg-[var(--background)] flex flex-col text-sm overflow-hidden`}>
         <Navbar />
+        <TrippyNav />
         {/* The children prop will render your individual pages (like chat, ingest, etc.) */}
         <div className="flex-1 flex overflow-hidden">
           {children}

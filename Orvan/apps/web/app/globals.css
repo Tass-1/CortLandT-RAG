@@ -11,22 +11,39 @@
   --color-muted: var(--muted);
 }
 
-:root, .dark {
-  --background: #0a0e17; /* Deep Stripe-like slate */
-  --foreground: #f3f4f6;
-  --surface: #131a28;
-  --border: #1f2937;
-  --primary: #635bff; /* Stripe Blurple */
-  --muted: #9ca3af;
-}
-
 @layer base {
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
+  :root {
+    --background: #000000;
+    --surface: #111111;
+    --border: #222222;
+    --foreground: #ffffff;
+    --muted: #888888;
+    --primary: #f5b342;
+    --accent: #ab9ff2;
+    --destructive: #ff453a;
   }
 }
 
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.bg-\[var\(--primary\)\] {
+  color: #000000 !important;
+}
+
+.hover\:bg-\[\#534be5\]:hover {
+  background-color: #ab9ff2 !important;
+  color: #000000 !important;
+}
+.bg-\[var\(--primary\)\] {
+  color: #000000 !important;
+}
+
+.hover\:bg-\[\#534be5\]:hover {
+  background-color: #e2e4e6 !important;
+}
 ::-webkit-scrollbar {
   width: 6px;
 }
