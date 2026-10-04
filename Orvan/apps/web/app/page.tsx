@@ -6,12 +6,17 @@ import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (localStorage.getItem("token") || localStorage.getItem("access_token")) {
+    // Check for the exact key your AuthPage uses
+    if (localStorage.getItem("orvan_jwt")) {
       setIsLoggedIn(true);
     }
+    
+    // Tell Next.js the component has safely mounted on the client
+    setMounted(true);
 
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
@@ -42,7 +47,7 @@ export default function HomePage() {
         </div>
 
         <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-6">
-          Financial data.
+          SEC Form 10K.
           <br />
           <span className="text-[var(--muted)]">Without the noise.</span>
         </h1>
@@ -51,25 +56,23 @@ export default function HomePage() {
           Autonomous ingestion of SEC Form 10-K filings. Real-time vector retrieval. Exact institutional metrics extracted instantly.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          {isLoggedIn ? (
-            <Link href="/chat">
-              <Button className="h-12 px-10 bg-[var(--primary)] text-[var(--background)] hover:bg-[#e2e4e6] font-bold text-sm tracking-widest uppercase transition-all rounded-none shadow-[0_0_40px_rgba(255,255,255,0.15)]">
-                Access Terminal
-              </Button>
-            </Link>
-          ) : (
+        {/* Fixed height container prevents layout jumping when buttons render */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 min-h-[48px] w-full">
+          {mounted && (
             <>
-              <Link href="/signup">
+              <Link href={isLoggedIn ? "/chat" : "/auth"}>
                 <Button className="h-12 px-10 bg-[var(--primary)] text-[var(--background)] hover:bg-[#e2e4e6] font-bold text-sm tracking-widest uppercase transition-all rounded-none shadow-[0_0_40px_rgba(255,255,255,0.15)]">
                   Initialize Workspace
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button className="h-12 px-10 bg-transparent border border-[var(--border)] text-white hover:bg-[var(--surface)] font-bold text-sm tracking-widest uppercase transition-all rounded-none">
-                  Authenticate
-                </Button>
-              </Link>
+
+              {!isLoggedIn && (
+                <Link href="/auth">
+                  <Button className="h-12 px-10 bg-transparent border border-[var(--border)] text-white hover:bg-[var(--surface)] font-bold text-sm tracking-widest uppercase transition-all rounded-none">
+                    Authenticate
+                  </Button>
+                </Link>
+              )}
             </>
           )}
         </div>

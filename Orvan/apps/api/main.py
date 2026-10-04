@@ -4,6 +4,7 @@ from routers.ingest import router as ingest_router
 from routers.auth import router as auth_router
 from routers.chat import router as chat_router
 from routers.sessions import router as session_router
+from routers.tickforfront import router as tick
 app = FastAPI()
 
 origins = [
@@ -24,3 +25,4 @@ app.include_router(ingest_router)
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(session_router)
+app.include_router(tick)

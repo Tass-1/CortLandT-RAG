@@ -1,112 +1,95 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAPI } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, YAxis } from "recharts";
 
-interface Asset {
-  ticker: string;
-  name: string;
-}
-
-export function TickerCard({ asset }: { asset: Asset }) {
-  const [marketData, setMarketData] = useState<{ price: number; change: number; chartData: any[] } | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [status, setStatus] = useState<{ type: "success" | "info" | "error"; msg: string } | null>(null);
+export function TickerCard({ ticker }: { ticker: string }) {
+  const [chartData, setChartData] = useState<{ value: number }[]>([]);
+  const [priceData, setPriceData] = useState({ price: 0, change: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/stock?ticker=${asset.ticker}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.error) setMarketData(data);
-      })
-      .catch((err) => console.error(err));
-  }, [asset.ticker]);
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`/api/stock?ticker=${ticker}`);
+        const data = await res.json();
+        
+        if (data.chartData && data.chartData.length > 0) {
+          const cleanData = data.chartData.filter(
+            (d: { value: number | null }) => typeof d.value === "number" && !isNaN(d.value)
+          );
+          setChartData(cleanData);
+          setPriceData({ price: data.price ?? 0, change: data.change ?? 0 });
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [ticker]);
 
-  const handleIngest = async () => {
-    setIsSyncing(true);
-    setStatus(null);
-    try {
-      const data = await fetchAPI(`/ingest?ticker=${asset.ticker}`, { method: "POST" });
-      if (data.status === "exists") setStatus({ type: "success", msg: "Already synced" });
-      else setStatus({ type: "info", msg: "Task dispatched" });
-    } catch (err: any) {
-      setStatus({ type: "error", msg: "Failed" });
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => setStatus(null), 4000);
-    }
-  };
-
-  const isPositive = marketData ? marketData.change >= 0 : true;
-  const strokeColor = isPositive ? "#34d399" : "#f87171";
-  const fillColor = isPositive ? "url(#colorEmerald)" : "url(#colorRed)";
+  const isPositive = priceData.change >= 0;
+  // Softened colors: Tailwind emerald-500 and red-500
+  const strokeColor = isPositive ? "#10b981" : "#ef4444";
+  
+  const basePrice = priceData.price - priceData.change;
+  const percentChange = basePrice > 0 ? (priceData.change / basePrice) * 100 : 0;
+  const gradientId = `chart-gradient-${ticker}`;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 flex flex-col h-52 shadow-md hover:border-[var(--primary)]/50 transition-colors group relative overflow-hidden">
+    <div className="group relative h-[160px] w-full overflow-hidden rounded-xl bg-[#09090b] border border-zinc-800/60 transition-all duration-300 hover:border-zinc-700 hover:bg-[#0c0c0e]">
       
-      <div className="flex items-start justify-between relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center font-bold text-white shadow-inner">
-            {asset.ticker.charAt(0)}
-          </div>
-          <div>
-            <h3 className="font-semibold text-white tracking-tight leading-tight">{asset.ticker}</h3>
-            <p className="text-[11px] text-[var(--muted)] truncate w-24 xl:w-32">{asset.name}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          {marketData ? (
-            <>
-              <div className="font-mono text-base text-white font-medium leading-tight">${marketData.price.toFixed(2)}</div>
-              <div className={`text-[11px] font-mono mt-0.5 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                {isPositive ? "+" : ""}{(marketData.change).toFixed(2)}
-              </div>
-            </>
+      <div className="relative z-10 flex h-full flex-col p-5 pointer-events-none">
+        <h3 className="text-sm font-medium tracking-wide text-zinc-400">
+          {ticker}
+        </h3>
+        
+        <div className="mt-1">
+          {!isLoading ? (
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-2xl font-medium tracking-tight text-zinc-100">
+                ${priceData.price.toFixed(2)}
+              </span>
+              <span className={`text-xs font-medium ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
+                {isPositive ? "+" : ""}{percentChange.toFixed(2)}%
+              </span>
+            </div>
           ) : (
-            <div className="text-xs text-[var(--muted)] animate-pulse pt-1">Loading data...</div>
+            <div className="h-8 w-32 animate-pulse rounded bg-zinc-800/50" />
           )}
         </div>
       </div>
 
-      {marketData && (
-        <div className="absolute inset-x-0 bottom-14 top-16 opacity-60 group-hover:opacity-100 transition-opacity duration-500">
+      <div className="absolute bottom-0 left-0 right-0 h-[80px] w-full opacity-70 transition-opacity duration-300 group-hover:opacity-100">
+        {!isLoading && chartData.length > 0 && (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={marketData.chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData}>
               <defs>
-                <linearGradient id="colorEmerald" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#34d399" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorRed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f87171" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#f87171" stopOpacity={0}/>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={strokeColor} stopOpacity={0.15} />
+                  <stop offset="100%" stopColor={strokeColor} stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <YAxis domain={['dataMin', 'dataMax']} hide />
-              <Area type="monotone" dataKey="value" stroke={strokeColor} fillOpacity={1} fill={fillColor} strokeWidth={2} isAnimationActive={false} />
+              <YAxis
+                domain={[
+                  (dataMin: number) => dataMin - Math.max(Math.abs(priceData.change) * 1.2, dataMin * 0.002),
+                  (dataMax: number) => dataMax + Math.max(Math.abs(priceData.change) * 1.2, dataMax * 0.002),
+                ]}
+                hide
+              />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={strokeColor}
+                strokeWidth={1.5}
+                fill={`url(#${gradientId})`}
+                isAnimationActive={false}
+              />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mt-auto border-t border-[var(--border)] pt-3 relative z-10 bg-[var(--surface)]">
-        <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium tracking-wider text-[var(--muted)] uppercase">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status?.type === 'error' ? 'bg-red-400' : 'bg-emerald-400'}`}></span>
-            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${status?.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-          </span>
-          {status ? status.msg : "Live Node"}
-        </div>
-        
-        <Button
-          onClick={handleIngest}
-          disabled={isSyncing}
-          className="h-8 px-4 bg-[var(--background)] border border-[var(--border)] text-white hover:bg-[var(--primary)] hover:border-[var(--primary)] text-xs font-medium transition-all"
-        >
-          {isSyncing ? "Syncing" : "Ingest"}
-        </Button>
+        )}
       </div>
     </div>
   );

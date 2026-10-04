@@ -7,26 +7,37 @@ from sqlalchemy import select
 router = APIRouter()
 
 @router.get("/get-sessions")
-async def session(email: str = Depends(verify_jwt) , postdb: Session = Depends(get_post)):
+async def session(email: str = Depends(verify_jwt), postdb: Session = Depends(get_post)):
     user = postdb.execute(select(User).where(User.email == email)).scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
     res = postdb.execute(
         select(Chatsession)
         .where(Chatsession.userId == user.id)
         .order_by(Chatsession.createdAt.desc())
     )
     sessions = res.scalars().all()
-    return {
-        "sessions": [
-            {
-                "session_id": session.id,
-                "ticker": session.ticker,
-                "created_at": session.createdAt
-            }
-            for session in sessions
-        ]
-    }
+    
+    output = []
+    for s in sessions:
+        msg = postdb.execute(
+            select(Messages)
+            .where(Messages.sessionId == s.id)
+            .where(Messages.role == "User")
+            .order_by(Messages.id.asc())
+        ).scalars().first()
+        
+        title = msg.content[:28] + "..." if msg and msg.content else f"{s.ticker} Audit"
+        
+        output.append({
+            "session_id": s.id,
+            "ticker": s.ticker,
+            "created_at": s.createdAt,
+            "title": title
+        })
+        
+    return {"sessions": output}
 
 @router.get("/session")
 async def nomorecodeplease(session_id: str, email: str = Depends(verify_jwt), postdb: Session = Depends(get_post)):

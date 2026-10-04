@@ -1,122 +1,187 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { fetchAPI } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { fetchAPI } from "@/lib/api"; 
 
 interface Message {
-  id: string;
-  role: "user" | "assistant" | "LLM" | "User"; // Backend uses "LLM" and "User"
+  id: string | number;
+  role: string; 
   content: string;
-  tool_used?: string | null;
 }
 
-export function ChatInterface() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session");
-  
-  const [messages, setMessages] = useState<Message[]>([]);
+export function ChatInterface({ sessionId }: { sessionId?: string }) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
-
-  // Load chat history when the session ID in the URL changes
-  useEffect(() => {
-    if (sessionId) {
-      fetchAPI(`/session?session_id=${sessionId}`)
-        .then((data) => {
-          if (data.messages) setMessages(data.messages);
-        })
-        .catch((err) => console.error("Failed to load chat history:", err));
-    } else {
-      setMessages([{
-        id: "initial",
-        role: "assistant",
-        content: "Connected to SEC filing archives. State an entity or metric to analyze.",
-      }]);
+    if (!sessionId) {
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: "Connected to SEC filing archives. Select a session or state an entity to analyze."
+        }
+      ]);
+      return;
     }
+
+    const loadSession = async () => {
+      try {
+        const data = await fetchAPI(`/session?session_id=${sessionId}`);
+        if (data.messages) {
+          setMessages(data.messages);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadSession();
   }, [sessionId]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const userText = input.trim();
-    setMessages((prev) => [...prev, { id: Date.now().toString(), role: "user", content: userText }]);
+    const userMsg: Message = { id: Date.now().toString(), role: "User", content: userText };
+    
+    setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
 
     try {
-      // If a session exists, append it to the URL query string for FastAPI
-      const endpoint = sessionId ? `/chat?session_id=${sessionId}` : "/chat";
-      
-      const data = await fetchAPI(endpoint, {
+      const data = await fetchAPI("/chat", {
         method: "POST",
-        body: JSON.stringify({ prompt: userText, ticker: "MSFT" }), // Keep MSFT hardcoded for now
+        body: JSON.stringify({ session_id: sessionId, message: userText }),
       });
+      
+      const assistantMsg: Message = { 
+        id: (Date.now() + 1).toString(), 
+        role: "assistant", 
+        content: data.response || data.message || data.text || "No response text found." 
+      };
+      setMessages(prev => [...prev, assistantMsg]);
 
-      setMessages((prev) => [
-        ...prev,
-        { id: (Date.now() + 1).toString(), role: "assistant", content: data.response },
-      ]);
-
-      // If this was a brand new chat, the backend generated a new session. Update the URL.
-      if (!sessionId && data.session_id) {
-        router.replace(`/chat?session=${data.session_id}`);
-      }
-    } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        { id: (Date.now() + 1).toString(), role: "assistant", content: `Error: ${err.message}` },
-      ]);
+    } catch (error: any) {
+      const errorMsg: Message = { 
+        id: (Date.now() + 1).toString(), 
+        role: "assistant", 
+        content: `Error: ${error.message || "Failed to fetch response."}` 
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6">
-        <div className="max-w-3xl mx-auto space-y-6 pb-32">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-4 ${msg.role.toLowerCase() === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.role.toLowerCase() !== "user" && (
-                <div className="w-8 h-8 rounded-full bg-[var(--primary)] shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                  O
-                </div>
-              )}
-              <div className={`flex-1 pt-1 ${msg.role.toLowerCase() === "user" ? "bg-[var(--surface)] border border-[var(--border)] rounded-2xl rounded-tr-sm px-5 py-3.5 max-w-[80%] text-[15px] shadow-sm ml-auto" : "max-w-full"}`}>
-                <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-[var(--foreground)]">
-                  {msg.content}
-                </div>
+    <div className="flex flex-col h-full bg-[#000000]">
+      <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 scrollbar-thin scrollbar-thumb-[#222222] scrollbar-track-transparent">
+        {messages.map((message) => {
+          const isUser = message.role.toLowerCase() === "user";
+
+          return (
+            <div key={message.id} className="flex flex-col w-full max-w-4xl mx-auto">
+              <div className="flex items-center gap-2 mb-1.5">
+                {isUser ? (
+                  <>
+                    <div className="w-5 h-5 rounded-sm bg-[#222222] flex items-center justify-center text-[10px] font-bold text-white">U</div>
+                    <span className="text-[12px] font-medium text-[#888888]">You</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-5 h-5 rounded-sm bg-[#f5b342] flex items-center justify-center text-[10px] font-bold text-black">O</div>
+                    <span className="text-[12px] font-medium text-white">Orvan</span>
+                  </>
+                )}
+              </div>
+
+              <div className="pl-7 text-[14px]">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    table: ({node, ...props}) => (
+                      <div className="w-full overflow-x-auto my-4 border border-[#222222] rounded-md bg-[#0a0a0a]">
+                        <table className="w-full text-left border-collapse" {...props} />
+                      </div>
+                    ),
+                    th: ({node, ...props}) => (
+                      <th className="border-b border-[#222222] bg-[#111111] p-3 text-white font-medium whitespace-nowrap" {...props} />
+                    ),
+                    td: ({node, ...props}) => (
+                      <td className="border-b border-[#1f1f1f] p-3 text-[#cccccc] align-top last:border-0" {...props} />
+                    ),
+                    p: ({node, ...props}) => (
+                      <p className="mb-3 last:mb-0 leading-relaxed text-[#e0e0e0]" {...props} />
+                    ),
+                    strong: ({node, ...props}) => (
+                      <strong className="font-semibold text-white" {...props} />
+                    ),
+                    code: ({node, inline, ...props}: any) => 
+                      inline ? (
+                        <code className="bg-[#1a1a1a] border border-[#333333] px-1.5 py-0.5 rounded text-[#f5b342] font-mono text-[12px]" {...props} />
+                      ) : (
+                        <div className="my-4 border border-[#222222] rounded-md overflow-hidden bg-[#0a0a0a]">
+                          <pre className="p-4 overflow-x-auto">
+                            <code className="text-[#cccccc] font-mono text-[13px]" {...props} />
+                          </pre>
+                        </div>
+                      )
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
             </div>
-          ))}
-          {isLoading && (
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-[var(--primary)] shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-sm">O</div>
-              <div className="pt-2 flex items-center gap-2 text-xs font-mono text-[var(--muted)]">
-                <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
-                <span>Running agentic routing & retrieval...</span>
-              </div>
-            </div>
-          )}
-          <div ref={scrollRef} />
-        </div>
+          );
+        })}
+        
+        {isLoading && (
+          <div className="flex flex-col w-full max-w-4xl mx-auto">
+             <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-5 h-5 rounded-sm bg-[#f5b342] flex items-center justify-center text-[10px] font-bold text-black">O</div>
+                <span className="text-[12px] font-medium text-white">Orvan</span>
+             </div>
+             <div className="pl-7 text-[14px] text-[#888888] animate-pulse">
+               Analyzing...
+             </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
-      <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[var(--background)] via-[var(--background)] to-transparent pt-20 pointer-events-none">
-        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto relative pointer-events-auto shadow-2xl">
-          <Input value={input} onChange={(e) => setInput(e.target.value)} disabled={isLoading} className="w-full h-14 pl-6 pr-24 rounded-2xl bg-[var(--surface)] border-[var(--border)] focus-visible:ring-1 focus-visible:ring-[var(--primary)] text-[15px] placeholder:text-[var(--muted)]" placeholder="Ask a question about SEC filings..." />
-          <Button type="submit" disabled={isLoading || !input.trim()} className="absolute right-2 top-2 bottom-2 rounded-xl bg-[var(--primary)] hover:bg-[#534be5] text-white px-6 transition-colors disabled:opacity-50">Send</Button>
-        </form>
+
+      <div className="w-full bg-[#0a0a0a] border-t border-[#1f1f1f] p-4 md:px-8">
+        <div className="max-w-4xl mx-auto">
+          <form onSubmit={handleSubmit} className="relative flex items-end bg-[#111111] border border-[#222222] focus-within:border-[#444444] rounded-xl transition-colors overflow-hidden">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask a question about SEC filings..."
+              className="w-full bg-transparent text-white text-[14px] px-4 py-4 outline-none placeholder:text-[#666666]"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-white text-black hover:bg-[#e0e0e0] disabled:opacity-50 disabled:hover:bg-white text-[13px] font-medium rounded-lg transition-all"
+            >
+              Send
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
-}
+} 

@@ -1,76 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TickerCard } from "@/components/ingest/TickerCard";
-
-const INITIAL_ASSETS = [
-  { ticker: "MSFT", name: "Microsoft Corporation", basePrice: 420.55 },
-  { ticker: "AAPL", name: "Apple Inc.", basePrice: 173.50 },
-  { ticker: "NVDA", name: "NVIDIA Corporation", basePrice: 880.20 },
-  { ticker: "TSLA", name: "Tesla, Inc.", basePrice: 175.34 },
-  { ticker: "AMZN", name: "Amazon.com, Inc.", basePrice: 185.20 },
-  { ticker: "META", name: "Meta Platforms, Inc.", basePrice: 502.30 },
-  { ticker: "JPM", name: "JPMorgan Chase & Co.", basePrice: 198.40 },
-  { ticker: "GOOGL", name: "Alphabet Inc.", basePrice: 165.80 },
-  { ticker: "PLTR", name: "Palantir Technologies", basePrice: 23.50 },
-];
+import { fetchAPI } from "@/lib/api";
 
 export default function IngestPage() {
-  const [assets, setAssets] = useState(INITIAL_ASSETS);
+  const [assets, setAssets] = useState<{ ticker: string; name: string }[]>([]);
   const [searchInput, setSearchInput] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleAddTicker = (e: React.FormEvent) => {
+  const fetchNodes = async () => {
+    try {
+      const data = await fetchAPI("/get-tickers");
+      if (data.nodes) {
+        setAssets(data.nodes);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNodes();
+    const interval = setInterval(fetchNodes, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAddTicker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchInput.trim()) return;
-    
-    const newTicker = searchInput.trim().toUpperCase();
-    
-    if (assets.some(a => a.ticker === newTicker)) {
-      setSearchInput("");
-      return;
-    }
 
-    setAssets((prev) => [
-      { ticker: newTicker, name: "Custom Added Entity", basePrice: Math.floor(Math.random() * 300) + 50 },
-      ...prev
-    ]);
+    const newTicker = searchInput.trim().toUpperCase();
     setSearchInput("");
+
+    try {
+      await fetchAPI(`/ingest?ticker=${newTicker}`, { method: "POST" });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--background)] p-8 md:p-12">
-      <div className="max-w-[1400px] mx-auto space-y-10">
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[var(--border)] pb-8">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-white">Market Intelligence Hub</h1>
-            <p className="text-[var(--muted)] text-base max-w-xl">
-              Monitor live entities and trigger autonomous SEC Form 10-K ingestion into the Qdrant vector space.
-            </p>
+    <div className="flex-1 overflow-y-auto bg-[#09090b] min-h-screen text-zinc-100">
+      <div className="border-b border-[#1f1f23] bg-[#0c0c0e]">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-white tracking-tight">Available Data</h1>
+            <p className="text-xs text-zinc-400 mt-1">Managed SEC Form 10-K filings and indexed vector entities</p>
           </div>
 
-          <form onSubmit={handleAddTicker} className="flex gap-3 w-full md:w-96 shadow-sm">
-            <Input 
+          <form onSubmit={handleAddTicker} className="flex items-center gap-2">
+            <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Enter ticker (e.g. COIN)..."
-              className="h-11 bg-[var(--surface)] border-[var(--border)] focus-visible:ring-1 focus-visible:ring-[var(--primary)] text-[15px]"
+              placeholder="Ticker symbol NVDA"
+              className="h-9 w-52 bg-[#141417] border-[#27272a] focus-visible:ring-1 focus-visible:ring-zinc-400 text-white  text-xs rounded uppercase placeholder:text-zinc-500 placeholder:normal-case"
             />
-            <Button type="submit" className="h-11 px-6 bg-[var(--primary)] text-white hover:bg-[#534be5] font-medium transition-colors">
-              Add Node
+            <Button
+              type="submit"
+              className="h-9 px-4 bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-semibold rounded transition-colors"
+            >
+              Add Ticker
             </Button>
           </form>
         </div>
+      </div>
 
-        {/* Larger, spacious grid layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {assets.map((asset) => (
-            <TickerCard key={asset.ticker} asset={asset} />
-          ))}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+            Tracked Entities ({assets.length})
+          </div>
         </div>
 
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-[156px] bg-[#111113] border border-[#222225] rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {assets.map((asset) => (
+              <TickerCard key={asset.ticker} ticker={asset.ticker} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

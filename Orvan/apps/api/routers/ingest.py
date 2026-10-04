@@ -26,6 +26,15 @@ async def ingestion(ticker: str, qdrant: QdrantClient = Depends(get_session) , g
         #send to chat
         print(result)
         print("There is teh ticker")
+        return {
+            "status": "exists", 
+            "ticker": ticker.upper(), 
+            "message": "Data already present in vector store."
+        }
     else:
-        fetch_file.delay(ticker)
-        return {"tick" : 'f{ticker}'}
+        fetch_file.delay(ticker.upper())
+        return {
+            "status": "processing", 
+            "ticker": ticker.upper(), 
+            "message": "Ingestion task dispatched to Celery."
+        }
