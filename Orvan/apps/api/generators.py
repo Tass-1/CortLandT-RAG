@@ -13,7 +13,7 @@ engine = create_engine(settings.POSTGRES)
 session = sessionmaker(autocommit=False, autoflush=False, bind=engine )
 base = declarative_base()
 
-
+#testing the ci cd pipeline ahh
 gclient = genai.Client(api_key = settings.GEMINI)
 def mongo():
     client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URI)
