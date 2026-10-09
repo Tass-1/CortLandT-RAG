@@ -1,0 +1,28 @@
+name: Deploy FastAPI Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Orvan/apps/api/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Oracle Cloud VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /home/ubuntu/CortLandT-RAG
+            git pull origin main
+            cd /home/ubuntu/CortLandT-RAG/Orvan/apps/api
+            /home/ubuntu/.local/bin/uv sync
+            sudo systemctl restart orvan
