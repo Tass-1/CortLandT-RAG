@@ -3,16 +3,42 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { fetchAPI } from "@/lib/api";
+import { useTickerStore } from "@/store/tickerStore";
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [availableTickers, setAvailableTickers] = useState<{ ticker: string; name: string }[]>([]);
+  
+ 
+  const { activeTicker, setActiveTicker } = useTickerStore();
 
   useEffect(() => {
     const token = localStorage.getItem("orvan_jwt") || localStorage.getItem("token");
-    setIsAuthenticated(!!token);
-  }, [pathname]);
+    const isAuth = !!token;
+    setIsAuthenticated(isAuth);
+
+    
+    if (isAuth) {
+      const fetchTickers = async () => {
+        try {
+          const data = await fetchAPI("/get-tickers");
+          if (data.nodes && data.nodes.length > 0) {
+            setAvailableTickers(data.nodes);
+           
+            if (!data.nodes.find((n: any) => n.ticker === activeTicker)) {
+              setActiveTicker(data.nodes[0].ticker);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch tickers for navbar:", error);
+        }
+      };
+      fetchTickers();
+    }
+  }, [pathname, activeTicker, setActiveTicker]);
 
   const handleSignOut = () => {
     localStorage.removeItem("orvan_jwt");
@@ -44,7 +70,25 @@ export function Navbar() {
         </nav>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
+      
+        {isAuthenticated && availableTickers.length > 0 && (
+          <div className="flex items-center gap-2 mr-4">
+            <span className="text-[12px] font-medium text-[#888888] uppercase tracking-wider">Active Asset</span>
+            <select 
+              value={activeTicker}
+              onChange={(e) => setActiveTicker(e.target.value)}
+              className="h-[32px] bg-[#1a1a1a] border border-[#2c2c2c] text-white text-[13px] font-bold px-3 rounded outline-none focus:border-[#f5b342] cursor-pointer"
+            >
+              {availableTickers.map((asset) => (
+                <option key={asset.ticker} value={asset.ticker}>
+                  {asset.ticker}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {isAuthenticated ? (
           <button 
             onClick={handleSignOut} 

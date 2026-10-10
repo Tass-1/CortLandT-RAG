@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { fetchAPI } from "@/lib/api"; 
+import { useTickerStore } from "@/store/tickerStore"; 
 
 interface Message {
   id: string | number;
@@ -16,6 +17,8 @@ export function ChatInterface({ sessionId }: { sessionId?: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  
+  const activeTicker = useTickerStore((state) => state.activeTicker);
 
   useEffect(() => {
     if (!sessionId) {
@@ -63,9 +66,14 @@ export function ChatInterface({ sessionId }: { sessionId?: string }) {
     setIsLoading(true);
 
     try {
-      const data = await fetchAPI("/chat", {
+      const endpoint = sessionId ? `/chat?session_id=${sessionId}` : "/chat";
+      
+      const data = await fetchAPI(endpoint, {
         method: "POST",
-        body: JSON.stringify({ session_id: sessionId, message: userText }),
+        body: JSON.stringify({ 
+          prompt: userText, 
+          ticker: activeTicker 
+        }),
       });
       
       const assistantMsg: Message = { 
@@ -156,7 +164,7 @@ export function ChatInterface({ sessionId }: { sessionId?: string }) {
                 <span className="text-[12px] font-medium text-white">Orvan</span>
              </div>
              <div className="pl-7 text-[14px] text-[#888888] animate-pulse">
-               Analyzing...
+                Analyzing...
              </div>
           </div>
         )}
@@ -184,4 +192,4 @@ export function ChatInterface({ sessionId }: { sessionId?: string }) {
       </div>
     </div>
   );
-} 
+}
