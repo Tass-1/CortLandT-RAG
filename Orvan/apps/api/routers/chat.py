@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from typing import Optional
 from fastembed import SparseTextEmbedding, TextEmbedding
 from groq import Groq
 from qdrant_client import models, QdrantClient
@@ -18,7 +19,7 @@ router = APIRouter()
 
 class Req(BaseModel):
     prompt: str
-    ticker:str
+    ticker: Optional[str] = "AAPL"
 
 dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
