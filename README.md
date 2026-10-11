@@ -27,7 +27,7 @@ The platform has two main data flows: **Data Ingestion** and **Chat / Query Retr
 Designed to handle massive SEC filings (often 300+ pages) asynchronously, without blocking the main FastAPI thread or timing out frontend requests.
 
 <p align="center">
-  <img src="docs/assets/ingestion-architecture.png" alt="Orvan ingestion architecture" width="800">
+  <img src="Orvan/docs/assets/ingestion-architecture.png" alt="Orvan ingestion architecture" width="800">
 </p>
 
 1. **Frontend to Backend:** The Next.js UI sends an ingestion request to the FastAPI backend over HTTP/REST.
@@ -45,7 +45,7 @@ Designed to handle massive SEC filings (often 300+ pages) asynchronously, withou
 Orvan enforces strict grounding by cross-referencing vector search results against immutable source documents in MongoDB.
 
 <p align="center">
-  <img src="docs/assets/chat-rag-architecture.png" alt="Orvan chat and retrieval architecture" width="800">
+  <img src="Orvan/docs/assets/chat-rag-architecture.png" alt="Orvan chat and retrieval architecture" width="800">
 </p>
 
 1. **Search execution:** A chat request hits the FastAPI `/chat` endpoint, which runs a hybrid search against Qdrant.
