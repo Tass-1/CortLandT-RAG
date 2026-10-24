@@ -4,7 +4,7 @@ const nextConfig = {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'http://137.23.57.25:8000/:path*', 
+        destination: 'http://137.23.57.25:80/:path*', 
       },
     ];
   },
