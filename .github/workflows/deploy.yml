@@ -12,6 +12,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Syntax Check
+        run: |
+          pip install ruff
+          # This scans your API folder for syntax errors, unused imports, or bad formatting
+          ruff check Orvan/apps/api/
+
       - name: Deploy to Oracle Cloud VM
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -26,3 +41,4 @@ jobs:
             cd /home/ubuntu/CortLandT-RAG/Orvan/apps/api
             /home/ubuntu/.local/bin/uv sync
             sudo systemctl restart orvan
+            sudo systemctl restart orvan-celery
