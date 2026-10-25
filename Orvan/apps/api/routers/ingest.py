@@ -23,7 +23,7 @@ async def ingestion(ticker: str, qdrant: QdrantClient = Depends(get_session) , g
             with_vectors=False,
     )
     if result:
-        #send to chat
+        #testing the ci tests if they will pass or no ignore this shit
         print(result)
         print("There is teh ticker")
         return {
