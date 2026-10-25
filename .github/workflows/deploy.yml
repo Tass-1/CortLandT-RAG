@@ -24,8 +24,8 @@ jobs:
       - name: Run Syntax Check
         run: |
           pip install ruff
-          # This scans your API folder for syntax errors, unused imports, or bad formatting
-          ruff check Orvan/apps/api/
+          # Checks syntax but explicitly ignores the FastAPI Depends() rule
+          ruff check Orvan/apps/api/ --ignore B008
 
       - name: Deploy to Oracle Cloud VM
         uses: appleboy/ssh-action@v1.2.0
