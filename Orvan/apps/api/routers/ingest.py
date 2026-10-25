@@ -25,6 +25,9 @@ async def ingestion(ticker: str, qdrant: QdrantClient = Depends(get_session) , g
     if result:
         #testing the ci tests if they will pass or no ignore this shit
         #again testing the ci cd piple line hope it works this time
+        #testing the ci tests if they will pass or no ignore this shit
+        #again testing the ci cd piple line hope it works this time
+        #again testing the ci cd piple line hope it works this time
         print(result)
         print("There is teh ticker")
         return {
